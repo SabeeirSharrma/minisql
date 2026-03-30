@@ -97,6 +97,7 @@ class ModernSQLiteEditor:
         if file_path:
             try:
                 self.conn = sqlite3.connect(file_path)
+                auth.sync_settings_to_firestore(file_path)
                 self.show_tables()
                 self.root.title(f"SQLite Studio - {file_path}")
             except Exception as e:

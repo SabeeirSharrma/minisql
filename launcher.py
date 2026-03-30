@@ -86,6 +86,7 @@ class LauncherApp(tk.Frame):
         self.email_var = tk.StringVar()
         self.pass_var = tk.StringVar()
         self.status_var = tk.StringVar(value="")
+        self.auth_view = "login"  # "login" | "register"
         self._render()
 
     def _render(self):
@@ -96,12 +97,12 @@ class LauncherApp(tk.Frame):
         if sess:
             self._render_mode_picker(sess)
         else:
-            self._render_login()
+            self._render_auth()
 
-    def _render_login(self):
+    def _render_auth(self):
         tk.Label(
             self,
-            text="SQLite Studio MVP",
+            text="MiniSQL Studio",
             font=("Segoe UI", 24, "bold"),
             bg="#2c3e50",
             fg="white",
@@ -109,7 +110,7 @@ class LauncherApp(tk.Frame):
 
         tk.Label(
             self,
-            text="Sign in to continue",
+            text="Sign in to continue" if self.auth_view == "login" else "Create an account",
             font=("Segoe UI", 10),
             bg="#2c3e50",
             fg="#bdc3c7",
@@ -132,14 +133,25 @@ class LauncherApp(tk.Frame):
 
         tk.Button(
             btns,
-            text="Login",
+            text="Login" if self.auth_view == "login" else "Register",
             bg="#27ae60",
             fg="white",
             relief=tk.FLAT,
             padx=14,
             pady=6,
-            command=self._do_login,
+            command=self._do_login if self.auth_view == "login" else self._do_register,
         ).pack(side=tk.LEFT)
+
+        tk.Button(
+            btns,
+            text="Create account" if self.auth_view == "login" else "Back to login",
+            bg="#34495e",
+            fg="#bdc3c7",
+            relief=tk.FLAT,
+            padx=12,
+            pady=6,
+            command=self._toggle_auth_view,
+        ).pack(side=tk.LEFT, padx=(10, 0))
 
         tk.Button(
             btns,
@@ -163,7 +175,12 @@ class LauncherApp(tk.Frame):
         ).pack(pady=(10, 0))
 
         if not auth.get_api_key():
-            self.status_var.set("Set FIREBASE_WEB_API_KEY in your environment to enable Firebase login.")
+            self.status_var.set("Add FIREBASE_WEB_API_KEY to your `.env` file to enable Firebase login.")
+
+    def _toggle_auth_view(self):
+        self.status_var.set("")
+        self.auth_view = "register" if self.auth_view == "login" else "login"
+        self._render()
 
     def _do_login(self):
         email = self.email_var.get().strip()
@@ -178,13 +195,26 @@ class LauncherApp(tk.Frame):
         except Exception as e:
             self.status_var.set(str(e))
 
+    def _do_register(self):
+        email = self.email_var.get().strip()
+        password = self.pass_var.get()
+        if not email or not password:
+            self.status_var.set("Enter email and password.")
+            return
+        try:
+            auth.sign_up(email, password)
+            self.status_var.set("")
+            self._render()
+        except Exception as e:
+            self.status_var.set(str(e))
+
     def _render_mode_picker(self, sess: dict):
         header = tk.Frame(self, bg="#2c3e50")
         header.pack(fill=tk.X, pady=(30, 0))
 
         tk.Label(
             header,
-            text="SQLite Studio MVP",
+            text="MiniSQL Studio",
             font=("Segoe UI", 24, "bold"),
             bg="#2c3e50",
             fg="white",
@@ -223,6 +253,17 @@ class LauncherApp(tk.Frame):
             pady=6,
             command=self._logout,
         ).pack(side=tk.RIGHT)
+
+        tk.Button(
+            bar,
+            text="Quit",
+            bg="#2c3e50",
+            fg="white",
+            relief=tk.FLAT,
+            padx=12,
+            pady=6,
+            command=self.parent.destroy,
+        ).pack(side=tk.RIGHT, padx=(0, 10))
 
         tk.Label(
             self,

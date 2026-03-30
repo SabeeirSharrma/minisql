@@ -84,6 +84,7 @@ class InteractiveSQLiteEditor:
         path = filedialog.askopenfilename(filetypes=[("SQLite", "*.db *.sqlite")])
         if path:
             self.conn = sqlite3.connect(path)
+            auth.sync_settings_to_firestore(path)
             self.db_label.config(text=path)
             self.refresh_tables()
 

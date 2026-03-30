@@ -65,6 +65,15 @@ def get_api_key() -> str | None:
     return key.strip() if key and isinstance(key, str) and key.strip() else None
 
 
+def _get_env(key: str) -> str | None:
+    val = os.environ.get(key)
+    if val and val.strip():
+        return val.strip()
+    _load_dotenv()
+    val = _DOTENV_CACHE.get(key)
+    return val.strip() if val and isinstance(val, str) and val.strip() else None
+
+
 def default_session_path() -> Path:
     base = Path(os.environ.get("APPDATA") or Path.home())
     return base / "minisql" / "session.json"
@@ -131,12 +140,179 @@ def _http_json(url: str, payload: dict[str, Any] | None = None, headers: dict[st
         raise AuthError(f"Network error: {e}") from e
 
 
+def _firestore_value(v: Any) -> dict[str, Any]:
+    # Minimal Firestore "Value" encoder for MVP settings.
+    if v is None:
+        return {"nullValue": None}
+    if isinstance(v, bool):
+        return {"booleanValue": v}
+    if isinstance(v, int) and not isinstance(v, bool):
+        return {"integerValue": str(v)}
+    if isinstance(v, float):
+        return {"doubleValue": v}
+    return {"stringValue": str(v)}
+
+
+def _firestore_fields(data: dict[str, Any]) -> dict[str, Any]:
+    return {"fields": {k: _firestore_value(v) for k, v in data.items()}}
+
+
+def save_user_data(data: dict[str, Any]) -> dict[str, Any]:
+    """
+    Saves key/value pairs to Firestore document `users/{uid}`.
+
+    Requires:
+    - `.env`: FIREBASE_PROJECT_ID=your-project-id
+    - authenticated session (Firebase idToken)
+    """
+    sess = ensure_session_valid(silent=False)
+    if not sess:
+        raise AuthError("No active session found.")
+
+    project_id = _get_env("FIREBASE_PROJECT_ID")
+    if not project_id:
+        raise AuthError("Missing FIREBASE_PROJECT_ID in environment or `.env` file.")
+
+    uid = str(sess.get("localId") or "")
+    if not uid:
+        raise AuthError("Session missing UID (localId).")
+
+    id_token = str(sess.get("idToken") or "")
+    if not id_token:
+        raise AuthError("Session missing idToken.")
+
+    # PATCH document with updateMask for provided keys.
+    update_mask = "&".join(
+        f"updateMask.fieldPaths={urllib.parse.quote(str(k))}"
+        for k in data.keys()
+        if str(k).strip()
+    )
+    qs = f"?{update_mask}" if update_mask else ""
+    url = f"https://firestore.googleapis.com/v1/projects/{urllib.parse.quote(project_id)}/databases/(default)/documents/users/{urllib.parse.quote(uid)}{qs}"
+
+    payload = _firestore_fields(data)
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        method="PATCH",
+        headers={
+            "Content-Type": "application/json",
+            # Firestore REST accepts Firebase Auth ID tokens for Firebase projects secured by rules.
+            "Authorization": f"Bearer {id_token}",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as res:
+            return json.loads(res.read().decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace")
+        raise AuthError(raw or str(e)) from e
+    except urllib.error.URLError as e:
+        raise AuthError(f"Network error: {e}") from e
+
+
+def load_user_data(field_names: list[str] | None = None) -> dict[str, Any]:
+    """
+    Loads Firestore document `users/{uid}` and returns a simple dict.
+    Only decodes primitive values we store in `_firestore_value()`.
+    """
+    sess = ensure_session_valid(silent=False)
+    if not sess:
+        raise AuthError("No active session found.")
+
+    project_id = _get_env("FIREBASE_PROJECT_ID")
+    if not project_id:
+        raise AuthError("Missing FIREBASE_PROJECT_ID in environment or `.env` file.")
+
+    uid = str(sess.get("localId") or "")
+    if not uid:
+        raise AuthError("Session missing UID (localId).")
+
+    id_token = str(sess.get("idToken") or "")
+    if not id_token:
+        raise AuthError("Session missing idToken.")
+
+    url = f"https://firestore.googleapis.com/v1/projects/{urllib.parse.quote(project_id)}/databases/(default)/documents/users/{urllib.parse.quote(uid)}"
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={"Authorization": f"Bearer {id_token}"},
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as res:
+            doc = json.loads(res.read().decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return {}
+        raw = e.read().decode("utf-8", errors="replace")
+        raise AuthError(raw or str(e)) from e
+    except urllib.error.URLError as e:
+        raise AuthError(f"Network error: {e}") from e
+
+    fields = (doc.get("fields") or {}) if isinstance(doc, dict) else {}
+    out: dict[str, Any] = {}
+
+    def _decode_value(val: dict[str, Any]) -> Any:
+        if "stringValue" in val:
+            return val.get("stringValue")
+        if "booleanValue" in val:
+            return bool(val.get("booleanValue"))
+        if "integerValue" in val:
+            try:
+                return int(val.get("integerValue"))
+            except Exception:
+                return val.get("integerValue")
+        if "doubleValue" in val:
+            return val.get("doubleValue")
+        if "nullValue" in val:
+            return None
+        return val
+
+    for k, v in fields.items():
+        if not isinstance(k, str) or not isinstance(v, dict):
+            continue
+        out[k] = _decode_value(v)
+
+    if field_names:
+        return {k: out.get(k) for k in field_names}
+    return out
+
+
 def sign_in_with_email_password(email: str, password: str) -> dict[str, Any]:
     api_key = get_api_key()
     if not api_key:
         raise AuthError("Missing FIREBASE_WEB_API_KEY in environment or `.env` file.")
 
     url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={urllib.parse.quote(api_key)}"
+    data = _http_json(
+        url,
+        payload={"email": email, "password": password, "returnSecureToken": True},
+    )
+
+    expires_in = int(data.get("expiresIn") or 0)
+    now = int(time.time())
+    session = {
+        "email": data.get("email"),
+        "displayName": data.get("displayName") or "",
+        "localId": data.get("localId"),
+        "idToken": data.get("idToken"),
+        "refreshToken": data.get("refreshToken"),
+        "expiresAt": now + max(0, expires_in - 30),
+        "provider": "firebase",
+    }
+    save_session(session)
+    return session
+
+
+def sign_up(email: str, password: str) -> dict[str, Any]:
+    """Creates a new user in Firebase (email/password) and saves the session."""
+    api_key = get_api_key()
+    if not api_key:
+        raise AuthError("Missing FIREBASE_WEB_API_KEY in environment or `.env` file.")
+
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={urllib.parse.quote(api_key)}"
     data = _http_json(
         url,
         payload={"email": email, "password": password, "returnSecureToken": True},
@@ -288,3 +464,80 @@ def open_account_window(parent_tk, title: str = "Account") -> None:
             win.destroy()
 
     tk.Button(btns, text="Logout", command=_logout, bg="#c0392b", fg="white", relief=tk.FLAT, padx=12, pady=6).pack(side=tk.LEFT)
+
+
+def sync_settings_to_firestore(last_db_path: str) -> None:
+    """Saves the last used database path to Firestore (users/{localId})."""
+    sync_to_accounts(
+        {
+            "last_opened_db": str(last_db_path or ""),
+            "last_sync": time.ctime(),
+        }
+    )
+
+
+def sync_to_accounts(data: dict[str, Any]) -> dict[str, Any] | None:
+    """
+    Saves user-specific data to the Firestore collection `accounts`,
+    using the user's `localId` as the document name.
+
+    Note: Firestore REST requires each field to be typed, e.g. `{"stringValue": "..."}`.
+    """
+    sess = ensure_session_valid(silent=True)
+    if not sess:
+        print("Sync failed: No active session.")
+        return None
+
+    project_id = _get_env("FIREBASE_PROJECT_ID")
+    api_key = _get_env("FIREBASE_WEB_API_KEY")
+    local_id = str(sess.get("localId") or "")
+    id_token = str(sess.get("idToken") or "")
+
+    if not project_id or not local_id or not id_token:
+        print("Sync failed: missing FIREBASE_PROJECT_ID or session tokens.")
+        return None
+
+    # Target a specific document: .../documents/accounts/{localId}
+    url_base = (
+        f"https://firestore.googleapis.com/v1/projects/{urllib.parse.quote(project_id)}"
+        f"/databases/(default)/documents/accounts/{urllib.parse.quote(local_id)}"
+    )
+
+    # Firestore PATCH requires `updateMask.fieldPaths` for partial updates.
+    update_masks = []
+    fields: dict[str, Any] = {}
+    for key, value in (data or {}).items():
+        if not str(key).strip():
+            continue
+        skey = str(key)
+        update_masks.append(f"updateMask.fieldPaths={urllib.parse.quote(skey)}")
+        # MVP: store everything as stringValue for simplicity.
+        fields[skey] = {"stringValue": str(value) if value is not None else ""}
+
+    if not fields:
+        return None
+
+    qs_parts = []
+    if api_key:
+        qs_parts.append(f"key={urllib.parse.quote(api_key)}")
+    qs_parts.extend(update_masks)
+
+    url = f"{url_base}?{'&'.join(qs_parts)}"
+    payload = {"fields": fields}
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        method="PATCH",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {id_token}",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as res:
+            return json.loads(res.read().decode("utf-8", errors="replace") or "{}")
+    except Exception as e:
+        print(f"Firestore Error: {e}")
+        return None
