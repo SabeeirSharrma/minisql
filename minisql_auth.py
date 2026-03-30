@@ -538,6 +538,13 @@ def sync_to_accounts(data: dict[str, Any]) -> dict[str, Any] | None:
     try:
         with urllib.request.urlopen(req, timeout=15) as res:
             return json.loads(res.read().decode("utf-8", errors="replace") or "{}")
+    except urllib.error.HTTPError as e:
+        try:
+            body = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            body = ""
+        print(f"Firestore Error (HTTP {e.code}): {body or str(e)}")
+        return None
     except Exception as e:
         print(f"Firestore Error: {e}")
         return None
