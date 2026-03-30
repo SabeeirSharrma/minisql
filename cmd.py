@@ -169,5 +169,8 @@ class ModernSQLiteEditor:
 
 if __name__ == "__main__":
     root = tk.Tk()
+    icon_path = Path(__file__).resolve().parent / "icon.ico"
+    if icon_path.exists():
+        root.iconbitmap(str(icon_path))
     app = ModernSQLiteEditor(root)
     root.mainloop()

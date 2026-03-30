@@ -69,6 +69,9 @@ def _create_mode_card(parent: tk.Widget, title: str, desc: str, on_click) -> tk.
 
 def main() -> None:
     root = tk.Tk()
+    icon_path = Path(__file__).resolve().parent / "icon.ico"
+    if icon_path.exists():
+        root.iconbitmap(str(icon_path))
     root.title("MiniSQL Launcher")
     root.geometry("720x360")
     root.configure(bg="#2c3e50")
