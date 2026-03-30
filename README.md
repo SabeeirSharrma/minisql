@@ -1,6 +1,6 @@
-# MiniSQL 🚀
+# MiniSQL Studio 🚀
 
-MiniSQL is a lightweight local SQLite management toolkit with a modern GUI and Firebase account integration. It provides two modes:
+MiniSQL Studio is a lightweight local SQLite management toolkit with a modern GUI and Firebase account integration. It provides two modes:
 
 - **SQL Pro Mode** (`cmd.py`): raw SQL editor for queries, table browsing, and results viewing.
 - **Interactive Mode** (`interactive.py`): form-driven CRUD by selecting tables and records.
