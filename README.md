@@ -1,6 +1,6 @@
 # MiniSQL Studio 🚀
 
-MiniSQL Studio is a lightweight local SQLite management toolkit with a modern GUI and Firebase account integration. It provides two modes:
+MiniSQL Studio is a lightweight local SQL management toolkit with a GUI. It provides two modes:
 
 - **SQL Pro Mode** (`cmd.py`): raw SQL editor for queries, table browsing, and results viewing.
 - **Interactive Mode** (`interactive.py`): form-driven CRUD by selecting tables and records.
@@ -42,14 +42,9 @@ Please note - I will NEVER ask you to sign up with your google acccount OR on an
 2. Open or create a `.db` / `.sqlite` file.
 3. Start querying, browsing or editing data.
 
-## Firebase Authentication 🔑
+##  Authentication 🔑
 
-To use authentication features, add a `.env` in the project root with:
-
-```dotenv
-FIREBASE_WEB_API_KEY=your_key_here
-FIREBASE_PROJECT_ID=your_project_id
-```
+To use MiniSQL Studio, Auth is currently required, register/login within the app.
 
 Then run `launcher.py`. Without keys, auth mode shows a message and features are limited.
 
