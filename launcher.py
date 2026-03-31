@@ -9,6 +9,10 @@ import minisql_auth as auth
 
 
 def _script_path(name: str) -> Path:
+    import sys
+
+    if hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS) / name
     return Path(__file__).resolve().parent / name
 
 

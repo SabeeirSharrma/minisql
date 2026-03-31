@@ -65,13 +65,32 @@ def get_api_key() -> str | None:
     return key.strip() if key and isinstance(key, str) and key.strip() else None
 
 
-def _get_env(key: str) -> str | None:
+def _get_env(key: str) -> str:
+    # Check system environment first (works in dev and kiosk mode)
     val = os.environ.get(key)
     if val and val.strip():
         return val.strip()
+
+    # Hardcoded fallback for bundled EXE builds where .env isn't used.
+    config = {
+        "FIREBASE_WEB_API_KEY": "your_actual_key_here",
+        "FIREBASE_PROJECT_ID": "your_project_id_here",
+    }
+    if key in config:
+        return config[key]
+
+    # Legacy .env support (non-EXE developer mode)
     _load_dotenv()
     val = _DOTENV_CACHE.get(key)
-    return val.strip() if val and isinstance(val, str) and val.strip() else None
+    return val.strip() if val and isinstance(val, str) and val.strip() else ""
+
+
+def _script_path(name: str) -> Path:
+    import sys
+
+    if hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS) / name
+    return Path(__file__).resolve().parent / name
 
 
 def default_session_path() -> Path:
