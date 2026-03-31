@@ -32,9 +32,9 @@ Both modes are launched from `launcher.py`, which also includes authentication v
 - Run the installer.
 - Register within the app (no code, only email and password)
 
-ONLY OFFICIAL SOURCES ARE [ansprojects.rf.gd](https://ansprojects.rf.gd/minisql) AND [Github releases](https://github.com/SabeeirSharrma/minisql/releases)
-Please note - I will NEVER ask you to sign up with your google acccount OR on any external site besides [ansprojects.rf.gd](https://ansprojects.rf.gd/minisql)
----
+***ONLY OFFICIAL SOURCES ARE [ansprojects.rf.gd](https://ansprojects.rf.gd/minisql) AND [Github releases](https://github.com/SabeeirSharrma/minisql/releases)
+Please note - I will NEVER ask you to sign up with your google acccount OR on any external site besides [ansprojects.rf.gd](https://ansprojects.rf.gd/minisql)***
+
 
 ## Quickstart ⚡
 
