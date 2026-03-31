@@ -25,34 +25,16 @@ Both modes are launched from `launcher.py`, which also includes authentication v
 
 ## Installation 🛠️
 
-### Pre-built from site (Windows ONLY) 🪟
+### Pre-built from site (Installer) 🪟
 ***No Python required***
 
-- Download the latest release package from the project [website](ansprojects.rf.gd/minisql).
+- Download the latest release package from the project [website](https://ansprojects.rf.gd/minisql) or [Github releases](https://github.com/SabeeirSharrma/minisql/releases).
 - Run the installer.
+- Register within the app (no code, only email and password)
 
-### Compile / run yourself (Universal) 🌐
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/SabeeirSharrma/minisql.git
-   cd minisql
-   ```
-2. Ensure Python 3.10+ is installed.
-3. (Optional) Create and activate a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # Linux/Mac
-   venv\Scripts\activate.bat   # Windows
-   ```
-4. Install dependencies
-    ```bash
-    pip install -r requirements.txt
-    ```
-5. Run:
-   ```bash
-   python launcher.py
-   ```
+ONLY OFFICIAL SOURCES ARE [ansprojects.rf.gd](https://ansprojects.rf.gd/minisql) AND [Github releases](https://github.com/SabeeirSharrma/minisql/releases)
+Please note - I will NEVER ask you to sign up with your google acccount OR on any external site besides [ansprojects.rf.gd](https://ansprojects.rf.gd/minisql)
+---
 
 ## Quickstart ⚡
 
