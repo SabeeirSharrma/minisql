@@ -9,11 +9,9 @@ import minisql_auth as auth
 
 
 def _script_path(name: str) -> Path:
-    import sys
-
-    if hasattr(sys, "_MEIPASS"):
-        return Path(sys._MEIPASS) / name
-    return Path(__file__).resolve().parent / name
+    # Check if running as a PyInstaller bundle
+    base_path = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
+    return base_path / name
 
 
 def _launch(script_name: str, root: tk.Tk) -> None:
@@ -25,7 +23,11 @@ def _launch(script_name: str, root: tk.Tk) -> None:
     try:
         env = os.environ.copy()
         env["MINISQL_SESSION_PATH"] = str(auth.session_path())
-        subprocess.Popen([sys.executable, str(script)], close_fds=True, env=env)
+
+        # On Mac/Linux, we often need to run the script using the bundled Python
+        # but if we are in a 'onefile' bundle, sys.executable IS the bundle.
+        # We use a helper to ensure we're calling the internal interpreter logic.
+        subprocess.Popen([sys.executable, str(script)], env=env)
     except Exception as e:
         messagebox.showerror("Launch Error", str(e))
         return

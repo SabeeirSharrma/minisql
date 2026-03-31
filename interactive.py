@@ -191,14 +191,15 @@ class InteractiveSQLiteEditor:
             ent.delete(0, tk.END)
 
     def open_launcher(self):
-        launcher = Path(__file__).resolve().parent / "launcher.py"
+        base_path = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
+        launcher = base_path / "launcher.py"
         if not launcher.exists():
             messagebox.showerror("Launch Error", f"Missing file: {launcher}")
             return
         try:
             env = os.environ.copy()
             env["MINISQL_SESSION_PATH"] = str(auth.session_path())
-            subprocess.Popen([sys.executable, str(launcher)], close_fds=True, env=env)
+            subprocess.Popen([sys.executable, str(launcher)], env=env)
         except Exception as e:
             messagebox.showerror("Launch Error", str(e))
             return
