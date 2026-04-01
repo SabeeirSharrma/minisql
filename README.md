@@ -44,11 +44,11 @@ Please note - I will NEVER ask you to sign up with your google acccount OR on an
 
 ##  Authentication 🔑
 
-To use MiniSQL Studio, Auth is currently required, register/login within the app.
+To use MiniSQL Studio, Auth via a local user account is currently required, register/login within the app.
 
-Then run `launcher.py`. Without keys, auth mode shows a message and features are limited.
+No data is shared
 
-## File Overview 📁
+## Files Overview 📁
 
 - `launcher.py`: main entrypoint and mode selector
 - `cmd.py`: SQL editor UI
@@ -63,3 +63,22 @@ Then run `launcher.py`. Without keys, auth mode shows a message and features are
 ## License 📜
 
 This project is licensed under the **MIT License**
+
+## Roadmap
+
+Current roadmap for this project:
+
+- **V1.x**:
+  - [x] SQLite support
+  - [ ] SQL support
+  - [x] Basic local-only features
+  - [ ] Access Remote DBs
+  - [ ] Local user accounts
+  - [ ] Complete bug patches for all these features
+
+- **v2.x**:
+  - [ ] Online authentication for user accounts
+  - [ ] MongoDB and PostgresDB support
+  - [ ] Complete bug patches for all these features
+
+- More Soon!

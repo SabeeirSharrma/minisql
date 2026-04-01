@@ -1,2 +1,2 @@
-tk
+PyQt5>=5.15
 auto-py-to-exe
