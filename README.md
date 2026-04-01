@@ -29,7 +29,8 @@ Both modes are launched from `launcher.py`, which also includes authentication v
 ***No Python required***
 
 - Download the latest release package from the project [website](https://ansprojects.rf.gd/minisql) or [Github releases](https://github.com/SabeeirSharrma/minisql/releases).
-- Run the installer.
+- In the minisql folder run `pip install -r requirements.txt`
+- Once dependencies are installed, run `python launcher.py`
 - Register within the app (no code, only email and password)
 
 ***ONLY OFFICIAL SOURCES ARE [ansprojects.rf.gd](https://ansprojects.rf.gd/minisql) AND [Github releases](https://github.com/SabeeirSharrma/minisql/releases)
@@ -39,7 +40,7 @@ Please note - I will NEVER ask you to sign up with your google acccount OR on an
 ## Quickstart ⚡
 
 1. Open launcher and choose a mode.
-2. Open or create a `.db` / `.sqlite` file.
+2. Open or create a `.db` / `.sqlite` / `.sqlite3` file.
 3. Start querying, browsing or editing data.
 
 ##  Authentication 🔑
