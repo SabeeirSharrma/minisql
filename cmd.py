@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 import subprocess
 import sys
@@ -15,6 +16,12 @@ from PyQt5.QtWidgets import (
 )
 
 import minisql_auth as auth
+
+
+def _quote_ident(name: str) -> str:
+    """Escape a SQLite identifier to prevent injection."""
+    escaped = name.replace('"', '""')
+    return f'"{ escaped }"'
 
 # ---------------------------------------------------------------------------
 # Stylesheet
@@ -180,7 +187,6 @@ class SQLHighlighter(QSyntaxHighlighter):
         self._comment_fmt.setFontItalic(True)
 
     def highlightBlock(self, text: str):
-        import re
         # Keywords (case-insensitive)
         for m in re.finditer(r'\b(' + '|'.join(KEYWORDS) + r')\b', text, re.IGNORECASE):
             self.setFormat(m.start(), m.end() - m.start(), self._kw_fmt)
@@ -339,6 +345,8 @@ class SQLProWindow(QMainWindow):
         )
         if path:
             try:
+                if self._conn:
+                    self._conn.close()
                 self._conn = sqlite3.connect(path)
                 self._db_path = path
                 auth.sync_settings_to_firestore(path)
@@ -360,7 +368,7 @@ class SQLProWindow(QMainWindow):
 
     def _load_table(self, item):
         name = item.text().strip()
-        self._editor.setPlainText(f"SELECT * FROM {name} LIMIT 1000;")
+        self._editor.setPlainText(f"SELECT * FROM {_quote_ident(name)} LIMIT 1000;")
         self._run_query()
 
     def _run_query(self):
@@ -419,6 +427,11 @@ class SQLProWindow(QMainWindow):
     def _open_account(self):
         from launcher import _open_account_dialog
         _open_account_dialog(self)
+
+    def closeEvent(self, event):
+        if self._conn:
+            self._conn.close()
+        super().closeEvent(event)
 
 
 # ---------------------------------------------------------------------------

@@ -16,6 +16,12 @@ from PyQt5.QtWidgets import (
 
 import minisql_auth as auth
 
+
+def _quote_ident(name: str) -> str:
+    """Escape a SQLite identifier to prevent injection."""
+    escaped = name.replace('"', '""')
+    return f'"{ escaped }"'
+
 # ---------------------------------------------------------------------------
 # Stylesheet  (shares dark-IDE aesthetic with cmd.py)
 # ---------------------------------------------------------------------------
@@ -315,6 +321,8 @@ class InteractiveWindow(QMainWindow):
             self, "Open Database", "", "SQLite (*.db *.sqlite *.sqlite3)"
         )
         if path:
+            if self._conn:
+                self._conn.close()
             self._conn = sqlite3.connect(path)
             auth.sync_settings_to_firestore(path)
             self._db_label.setText(Path(path).name)
@@ -323,6 +331,8 @@ class InteractiveWindow(QMainWindow):
             self._set_status(f"Opened: {path}")
 
     def _refresh_tables(self):
+        if not self._conn:
+            return
         self._tables_list.clear()
         cur = self._conn.cursor()
         cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
@@ -340,7 +350,7 @@ class InteractiveWindow(QMainWindow):
         if not self._current_table:
             return
         cur = self._conn.cursor()
-        cur.execute(f"SELECT * FROM {self._current_table}")
+        cur.execute(f"SELECT * FROM {_quote_ident(self._current_table)}")
         cols = [d[0] for d in cur.description]
         rows = cur.fetchall()
         self._table.setColumnCount(len(cols))
@@ -362,7 +372,7 @@ class InteractiveWindow(QMainWindow):
         self._form_inputs.clear()
 
         cur = self._conn.cursor()
-        cur.execute(f"PRAGMA table_info({self._current_table})")
+        cur.execute(f"PRAGMA table_info({_quote_ident(self._current_table)})")
         cols = cur.fetchall()  # (cid, name, type, notnull, dflt, pk)
 
         for i, col in enumerate(cols):
@@ -396,11 +406,11 @@ class InteractiveWindow(QMainWindow):
         if not self._current_table:
             return
         data = self._get_form_data()
-        cols = ", ".join(data.keys())
+        cols = ", ".join(_quote_ident(k) for k in data.keys())
         ph = ", ".join(["?"] * len(data))
         try:
             self._conn.execute(
-                f"INSERT INTO {self._current_table} ({cols}) VALUES ({ph})",
+                f"INSERT INTO {_quote_ident(self._current_table)} ({cols}) VALUES ({ph})",
                 list(data.values())
             )
             self._conn.commit()
@@ -415,14 +425,19 @@ class InteractiveWindow(QMainWindow):
         data = self._get_form_data()
         if not data:
             return
-        cols = list(data.keys())
-        pk_col = cols[0]
+        pk_col = self._get_pk_col()
+        if not pk_col or pk_col not in data:
+            QMessageBox.warning(self, "Error", "Cannot determine primary key for this table.")
+            return
         pk_val = data[pk_col]
-        set_clause = ", ".join(f"{k} = ?" for k in cols)
+        non_pk = {k: v for k, v in data.items() if k != pk_col}
+        if not non_pk:
+            return
+        set_clause = ", ".join(f"{_quote_ident(k)} = ?" for k in non_pk)
         try:
             self._conn.execute(
-                f"UPDATE {self._current_table} SET {set_clause} WHERE {pk_col} = ?",
-                list(data.values()) + [pk_val]
+                f"UPDATE {_quote_ident(self._current_table)} SET {set_clause} WHERE {_quote_ident(pk_col)} = ?",
+                list(non_pk.values()) + [pk_val]
             )
             self._conn.commit()
             self._refresh_data()
@@ -436,10 +451,21 @@ class InteractiveWindow(QMainWindow):
         row = self._table.currentRow()
         if row < 0:
             return
-        pk_item = self._table.item(row, 0)
+        pk_col = self._get_pk_col()
+        if not pk_col:
+            QMessageBox.warning(self, "Error", "Cannot determine primary key for this table.")
+            return
+        # Find the column index for the PK
+        pk_col_idx = None
+        for c in range(self._table.columnCount()):
+            if self._table.horizontalHeaderItem(c).text() == pk_col:
+                pk_col_idx = c
+                break
+        if pk_col_idx is None:
+            return
+        pk_item = self._table.item(row, pk_col_idx)
         if not pk_item:
             return
-        pk_col = self._table.horizontalHeaderItem(0).text()
         pk_val = pk_item.text()
         reply = QMessageBox.question(
             self, "Confirm", f"Delete record where {pk_col} = '{pk_val}'?",
@@ -448,7 +474,7 @@ class InteractiveWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             try:
                 self._conn.execute(
-                    f"DELETE FROM {self._current_table} WHERE {pk_col} = ?", (pk_val,)
+                    f"DELETE FROM {_quote_ident(self._current_table)} WHERE {_quote_ident(pk_col)} = ?", (pk_val,)
                 )
                 self._conn.commit()
                 self._refresh_data()
@@ -461,8 +487,24 @@ class InteractiveWindow(QMainWindow):
         for ent in self._form_inputs.values():
             ent.clear()
 
+    def _get_pk_col(self) -> str | None:
+        """Return the primary-key column name for the current table, or None."""
+        if not self._conn or not self._current_table:
+            return None
+        cur = self._conn.cursor()
+        cur.execute(f"PRAGMA table_info({_quote_ident(self._current_table)})")
+        for row in cur.fetchall():
+            if row[5] > 0:  # pk flag
+                return row[1]
+        return None
+
     def _set_status(self, msg: str):
         self._status_bar.setText(f"  {msg}")
+
+    def closeEvent(self, event):
+        if self._conn:
+            self._conn.close()
+        super().closeEvent(event)
 
     def _go_launcher(self):
         base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))

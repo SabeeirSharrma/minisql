@@ -14,14 +14,11 @@ Both modes are launched from `launcher.py`, which also includes authentication v
 - 🧠 Run arbitrary SQL queries (SELECT/INSERT/UPDATE/DELETE/DDL)
 - 🔄 Auto-refresh table list after DML
 - 🧩 Interactive CRUD with per-table form generation
-- 🔐 Login / registration and user settings sync to Firestore (optional with Firebase API key)
+- 🔐 Login / registration with local user accounts
 
 ## Requirements 🧩
 
 - Python 3.10+
-- Optional: Firebase config in `.env` (for auth)
-  - `FIREBASE_WEB_API_KEY`
-  - `FIREBASE_PROJECT_ID`
 
 ## Installation 🛠️
 
@@ -54,7 +51,7 @@ No data is shared
 - `launcher.py`: main entrypoint and mode selector
 - `cmd.py`: SQL editor UI
 - `interactive.py`: CRUD UI builder
-- `minisql_auth.py`: session/auth helper + Firestore sync
+- `minisql_auth.py`: session/auth helper (local accounts)
 
 ## Notes 📝
 

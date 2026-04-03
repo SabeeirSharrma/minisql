@@ -1,13 +1,10 @@
-import sqlite3
 import hashlib
 import json
 import os
+import sqlite3
 import sys
 import time
-import tkinter as tk
-from tkinter import messagebox
 from pathlib import Path
-from dataclasses import dataclass
 
 
 # ---------------------------------------------------------------------------
@@ -156,44 +153,3 @@ def sync_settings_to_firestore(*_args, **_kwargs) -> None:
 def get_api_key() -> str | None:
     """No-op: Firebase removed."""
     return None
-
-
-# ---------------------------------------------------------------------------
-# Account window  (shown from cmd.py / interactive.py toolbar)
-# ---------------------------------------------------------------------------
-
-def open_account_window(parent: tk.Tk) -> None:
-    sess = load_session()
-    win = tk.Toplevel(parent)
-    win.title("Account")
-    win.geometry("320x200")
-    win.resizable(False, False)
-    win.configure(bg="#2c3e50")
-    win.grab_set()
-
-    tk.Label(win, text="👤 Account", font=("Segoe UI", 14, "bold"),
-             bg="#2c3e50", fg="white").pack(pady=(20, 6))
-
-    username = sess.get("username", "Unknown") if sess else "Not signed in"
-    tk.Label(win, text=f"Signed in as:  {username}", font=("Segoe UI", 10),
-             bg="#2c3e50", fg="#ecf0f1").pack(pady=4)
-
-    if sess:
-        ts = sess.get("logged_in_at", 0)
-        from datetime import datetime
-        dt = datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
-        tk.Label(win, text=f"Session started:  {dt}", font=("Segoe UI", 9),
-                 bg="#2c3e50", fg="#bdc3c7").pack(pady=2)
-
-    btn_row = tk.Frame(win, bg="#2c3e50")
-    btn_row.pack(pady=18)
-
-    def _logout():
-        clear_session()
-        win.destroy()
-        messagebox.showinfo("Logged out", "You have been logged out.\nPlease restart the app to sign in again.")
-
-    tk.Button(btn_row, text="Logout", bg="#c0392b", fg="white",
-              relief=tk.FLAT, padx=14, pady=6, command=_logout).pack(side=tk.LEFT, padx=6)
-    tk.Button(btn_row, text="Close", bg="#34495e", fg="white",
-              relief=tk.FLAT, padx=14, pady=6, command=win.destroy).pack(side=tk.LEFT, padx=6)

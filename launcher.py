@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from PyQt5.QtCore import Qt
@@ -414,7 +415,6 @@ def _open_account_dialog(parent):
     lay.addWidget(QLabel(f"Signed in as:  {uname}"))
 
     if sess and "logged_in_at" in sess:
-        from datetime import datetime
         dt = datetime.fromtimestamp(sess["logged_in_at"]).strftime("%Y-%m-%d  %H:%M")
         s = QLabel(f"Session started:  {dt}")
         s.setObjectName("Subtitle")
