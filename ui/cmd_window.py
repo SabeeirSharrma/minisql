@@ -1,7 +1,6 @@
 import os
 import re
 import sqlite3
-import subprocess
 import sys
 from pathlib import Path
 
@@ -15,144 +14,13 @@ from PyQt5.QtWidgets import (
     QSizePolicy,
 )
 
-import minisql_auth as auth
+from services import auth_service as auth
 
 
 def _quote_ident(name: str) -> str:
     """Escape a SQLite identifier to prevent injection."""
     escaped = name.replace('"', '""')
     return f'"{ escaped }"'
-
-# ---------------------------------------------------------------------------
-# Stylesheet
-# ---------------------------------------------------------------------------
-STYLE = """
-QMainWindow, QWidget {
-    background: #0D1117;
-    font-family: 'Segoe UI', 'SF Pro Display', sans-serif;
-    color: #C9D1D9;
-}
-/* Toolbar */
-#Toolbar {
-    background: #161B22;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-/* Sidebar */
-#Sidebar {
-    background: #0D1117;
-    border-right: 1px solid rgba(255,255,255,0.06);
-}
-#SidebarTitle {
-    font-size: 10px; font-weight: 700;
-    color: rgba(255,255,255,0.25);
-    letter-spacing: 1.5px;
-    padding: 16px 16px 6px 16px;
-}
-QListWidget {
-    background: transparent;
-    border: none;
-    outline: none;
-    font-size: 13px;
-    color: #8B949E;
-}
-QListWidget::item {
-    padding: 8px 16px;
-    border-radius: 6px;
-    margin: 1px 6px;
-}
-QListWidget::item:selected {
-    background: rgba(59,130,246,0.18);
-    color: #79C0FF;
-}
-QListWidget::item:hover:!selected {
-    background: rgba(255,255,255,0.04);
-    color: #C9D1D9;
-}
-/* Editor */
-#EditorLabel {
-    font-size: 10px; font-weight: 700;
-    color: rgba(255,255,255,0.25);
-    letter-spacing: 1.5px;
-}
-QTextEdit {
-    background: #161B22;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 8px;
-    padding: 12px;
-    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-    font-size: 13px;
-    color: #C9D1D9;
-    selection-background-color: #264F78;
-}
-QTextEdit:focus { border-color: rgba(59,130,246,0.50); }
-/* Results table */
-QTableWidget {
-    background: #161B22;
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 8px;
-    gridline-color: rgba(255,255,255,0.05);
-    font-size: 12px;
-    color: #C9D1D9;
-    outline: none;
-}
-QTableWidget::item { padding: 6px 12px; border: none; }
-QTableWidget::item:selected { background: rgba(59,130,246,0.20); color: #E8EAF0; }
-QHeaderView::section {
-    background: #1C2128;
-    color: rgba(255,255,255,0.45);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.8px;
-    padding: 8px 12px;
-    border: none;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-/* Buttons */
-#BtnRun {
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #2563EB, stop:1 #3B82F6);
-    border: none; border-radius: 7px;
-    padding: 8px 20px; font-size: 13px; font-weight: 600; color: white;
-    min-width: 100px;
-}
-#BtnRun:hover { background: #1D4ED8; }
-#BtnRun:pressed { background: #1E40AF; }
-#BtnTool {
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.10);
-    border-radius: 7px;
-    padding: 7px 14px; font-size: 12px; color: #8B949E;
-}
-#BtnTool:hover { background: rgba(255,255,255,0.06); color: #C9D1D9; border-color: rgba(255,255,255,0.20); }
-/* Status bar */
-#StatusBar {
-    background: #161B22;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    padding: 4px 16px;
-    font-size: 11px;
-    color: rgba(255,255,255,0.30);
-}
-/* Scrollbar */
-QScrollBar:vertical {
-    background: transparent; width: 8px; margin: 0;
-}
-QScrollBar::handle:vertical {
-    background: rgba(255,255,255,0.12); border-radius: 4px; min-height: 20px;
-}
-QScrollBar::handle:vertical:hover { background: rgba(255,255,255,0.22); }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-QScrollBar:horizontal {
-    background: transparent; height: 8px;
-}
-QScrollBar::handle:horizontal {
-    background: rgba(255,255,255,0.12); border-radius: 4px; min-width: 20px;
-}
-QScrollBar::handle:horizontal:hover { background: rgba(255,255,255,0.22); }
-QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
-/* Splitter */
-QSplitter::handle { background: rgba(255,255,255,0.05); }
-QSplitter::handle:horizontal { width: 1px; }
-QSplitter::handle:vertical { height: 1px; }
-"""
 
 
 # ---------------------------------------------------------------------------
@@ -187,16 +55,12 @@ class SQLHighlighter(QSyntaxHighlighter):
         self._comment_fmt.setFontItalic(True)
 
     def highlightBlock(self, text: str):
-        # Keywords (case-insensitive)
         for m in re.finditer(r'\b(' + '|'.join(KEYWORDS) + r')\b', text, re.IGNORECASE):
             self.setFormat(m.start(), m.end() - m.start(), self._kw_fmt)
-        # Strings
         for m in re.finditer(r"'[^']*'", text):
             self.setFormat(m.start(), m.end() - m.start(), self._str_fmt)
-        # Numbers
         for m in re.finditer(r'\b\d+(\.\d+)?\b', text):
             self.setFormat(m.start(), m.end() - m.start(), self._num_fmt)
-        # Comments
         idx = text.find('--')
         if idx >= 0:
             self.setFormat(idx, len(text) - idx, self._comment_fmt)
@@ -214,15 +78,12 @@ class SQLProWindow(QMainWindow):
         self._conn = None
         self._db_path = None
 
-        icon_path = Path(__file__).resolve().parent / "icon.ico"
+        icon_path = Path(__file__).resolve().parent.parent / "icon.ico"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
 
         self._build()
 
-    # ------------------------------------------------------------------
-    # Layout
-    # ------------------------------------------------------------------
     def _build(self):
         central = QWidget()
         central.setObjectName("Root")
@@ -232,10 +93,8 @@ class SQLProWindow(QMainWindow):
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
-        # Toolbar
         root_layout.addWidget(self._make_toolbar())
 
-        # Body: horizontal splitter
         splitter = QSplitter(Qt.Horizontal)
         splitter.setHandleWidth(1)
 
@@ -248,7 +107,6 @@ class SQLProWindow(QMainWindow):
 
         root_layout.addWidget(splitter, stretch=1)
 
-        # Status bar
         self._status_bar = QLabel("Ready")
         self._status_bar.setObjectName("StatusBar")
         root_layout.addWidget(self._status_bar)
@@ -307,7 +165,6 @@ class SQLProWindow(QMainWindow):
         lay.setContentsMargins(16, 14, 16, 14)
         lay.setSpacing(10)
 
-        # Editor section
         editor_header = QHBoxLayout()
         lbl = QLabel("SQL QUERY EDITOR")
         lbl.setObjectName("EditorLabel")
@@ -321,12 +178,10 @@ class SQLProWindow(QMainWindow):
         SQLHighlighter(self._editor.document())
         lay.addWidget(self._editor)
 
-        # Results label
         res_lbl = QLabel("RESULTS")
         res_lbl.setObjectName("EditorLabel")
         lay.addWidget(res_lbl)
 
-        # Table
         self._table = QTableWidget()
         self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -336,9 +191,6 @@ class SQLProWindow(QMainWindow):
 
         return widget
 
-    # ------------------------------------------------------------------
-    # Logic
-    # ------------------------------------------------------------------
     def _open_db(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Open Database", "", "SQLite DB (*.db *.sqlite *.sqlite3)"
@@ -420,36 +272,16 @@ class SQLProWindow(QMainWindow):
         self._status_bar.setText(f"  {msg}")
 
     def _go_launcher(self):
-        base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
-        launcher = base / "launcher.py"
-        if not launcher.exists():
-            QMessageBox.critical(self, "Launch Error", f"Missing file: {launcher}")
-            return
-        try:
-            env = os.environ.copy()
-            env["MINISQL_SESSION_PATH"] = str(auth.session_path())
-            subprocess.Popen([sys.executable, str(launcher)], env=env)
-            self.close()
-        except Exception as e:
-            QMessageBox.critical(self, "Launch Error", str(e))
+        from ui.launcher_window import LauncherWindow
+        self.launcher = LauncherWindow()
+        self.launcher.show()
+        self.close()
 
     def _open_account(self):
-        from launcher import _open_account_dialog
+        from ui.launcher_window import _open_account_dialog
         _open_account_dialog(self)
 
     def closeEvent(self, event):
         if self._conn:
             self._conn.close()
         super().closeEvent(event)
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    app.setStyleSheet(STYLE)
-    win = SQLProWindow()
-    win.show()
-    sys.exit(app.exec_())
